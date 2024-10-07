@@ -1,0 +1,16 @@
+[package]
+name = "http_ez"
+version = "0.1.0"
+edition = "2021"
+
+
+[lib]
+name = "http_ez"
+path = "src/lib.rs"
+
+[[bin]]
+name = "testing"
+path = "src/bin/testing.rs"
+
+[dependencies]
+uuid = { version = "1.10.0", features = ["fast-rng", "v7"] }
