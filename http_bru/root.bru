@@ -1,0 +1,15 @@
+meta {
+  name: root
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://127.0.0.1:8080/?test=asdf
+  body: json
+  auth: none
+}
+
+params:query {
+  test: asdf
+}
