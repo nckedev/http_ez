@@ -47,10 +47,10 @@ impl Server {
         }
 
         println!("logger");
-        if let Some(logger) = app.service_collection.get::<Logger>() {
-            println!("logger");
-            logger.log_info("TESTING");
-        }
+        // if let Some(logger) = app.service_collection.get::<Logger>() {
+        //     println!("logger");
+        //     logger.log_info("TESTING");
+        // }
 
         println!("{:#?}", request);
         //assert_eq!(app.service_collection.has_any(), true);
@@ -80,7 +80,7 @@ impl AppBuilder {
 
     pub fn register_service<T: 'static + Default>(&mut self, scope: ServiceScope) -> &mut Self {
         println!("register service");
-        match self.service_collection.add(T::default(), scope) {
+        match self.service_collection.add::<T>(scope) {
             Ok(()) => self,
             Err(_) => panic!("could not create service"),
         }
@@ -125,7 +125,9 @@ impl From<&str> for Environment {
     }
 }
 
-struct AppContext {}
+struct AppContext {
+    environment: Environment,
+}
 
 pub struct App {
     service_collection: ServiceCollection,

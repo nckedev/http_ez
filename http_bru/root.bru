@@ -5,11 +5,22 @@ meta {
 }
 
 get {
-  url: http://127.0.0.1:8080/?test=asdf
+  url: http://127.0.0.1:8080/ress?test=asdf&test23=123
   body: json
   auth: none
 }
 
 params:query {
   test: asdf
+  test23: 123
+}
+
+body:json {
+  {
+    "key" : "value"
+  }
+}
+
+assert {
+  : 
 }

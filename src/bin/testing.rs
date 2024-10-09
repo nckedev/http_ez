@@ -3,7 +3,7 @@ use http_ez::server::*;
 
 trait Test {}
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct MyService;
 
 impl MyService {
