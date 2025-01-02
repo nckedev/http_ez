@@ -26,6 +26,17 @@ impl<'a> Request<'a> {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            id: Uuid::nil()
+            method: todo!(),
+            path: todo!(),
+            protocol_version: todo!(),
+            headers: todo!(),
+            body: todo!(),
+        }
+    }
+
     pub fn add_header(&mut self, key: &str, value: &str) {
         self.headers.insert(key.to_owned(), value.to_owned());
     }

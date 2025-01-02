@@ -8,7 +8,7 @@ pub struct Response<'a> {
 }
 
 impl<'a> Response<'a> {
-    fn success(body: &'a str) -> Self {
+    fn ok(body: &'a str) -> Self {
         Response {
             headers: HashMap::new(),
             status_code: StatusCode::Success,
@@ -27,12 +27,12 @@ impl<'a> Into<Response<'a>> for &'a str {
     }
 }
 
-impl<'a> Into<Response<'a>> for StatusCode {
+impl<'a> Into<Response<'a>> for (StatusCode, &'a str) {
     fn into(self) -> Response<'a> {
         Response {
             headers: HashMap::new(),
-            status_code: self,
-            body: "",
+            status_code: self.0,
+            body: self.1,
         }
     }
 }

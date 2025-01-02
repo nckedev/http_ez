@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Logger<'sink> {
     sinks: Vec<Box<&'sink dyn LogSink>>,
     log_level: Severity,
@@ -17,21 +18,53 @@ impl<'sink> Logger<'sink> {
         self.sinks.push(Box::new(sink));
     }
 
-    fn set_log_level(&mut self, level: Severity) {
+    pub fn set_log_level(&mut self, level: Severity) {
         self.log_level = level;
     }
 
-    pub fn log_info(&self, message: &str) {
-        for sink in &self.sinks {
-            sink.collect(&("LOG INFO -> ".to_string() + message));
-        }
+    pub fn log_debug<'a, T: Into<&'a str>>(&self, message: T) {
+        self.log(Severity::Debug, message.into());
     }
 
-    pub fn log_trace(&mut self, message: &impl Into<String>) {}
+    pub fn log_trace<'a, T: Into<&'a str>>(&self, message: T) {
+        self.log(Severity::Trace, message.into());
+    }
+
+    pub fn log_info(&self, message: &str) {
+        self.log(Severity::Info, message);
+    }
+    pub fn log_warning<'a, T: Into<&'a str>>(&self, message: T) {
+        self.log(Severity::Warning, message.into());
+    }
+
+    pub fn log_error<'a, T: Into<&'a str>>(&self, message: T) {
+        self.log(Severity::Error, message.into());
+    }
+
+    pub fn log_critical<'a, T: Into<&'a str>>(&self, message: T) {
+        self.log(Severity::Critical, message.into());
+    }
 
     fn log(&self, severity: Severity, message: &str) {
+        if severity < self.log_level {
+            return;
+        }
+
+        let t = chrono::Utc::now().to_string();
+        let timestamp = format!("[{t}]");
+
+        let prefix = match severity {
+            Severity::Debug => "[DEBUG] ",
+            Severity::Trace => "[TRACE] ",
+            Severity::Info => "[INFO] ",
+            Severity::Warning => "[WARNING] ",
+            Severity::Error => "[ERROR] ",
+            Severity::Critical => "[CRITICAL] ",
+        };
+
         for x in &self.sinks {
-            x.collect(&message);
+            let s = format!("{timestamp}{prefix} -> {message}");
+            x.collect(&s);
         }
     }
 }
@@ -56,8 +89,8 @@ struct LogEntry {
     message: String,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Default)]
-enum Severity {
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub enum Severity {
     Debug,
     Trace,
     #[default]

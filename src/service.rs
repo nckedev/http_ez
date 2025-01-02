@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::{Rc, Weak};
-use std::sync::Arc;
 
 use crate::server::ServiceScope;
 
@@ -59,7 +58,7 @@ struct ServiceId {
 //     println!("Reference count of obj1: {}", Rc::strong_count(&obj1)); // Returns 2
 //     println!("Reference count of obj3: {}", Rc::strong_count(&obj3)); // Returns 2
 // }
-struct ServiceProvider {
+pub struct ServiceProvider {
     service_collection: HashMap<ServiceId, Option<Weak<RefCell<dyn Any>>>>,
 }
 
@@ -77,7 +76,7 @@ impl ServiceProvider {
         if let Some(key) = self.service_collection.get(&id) {
             if let Some(weak_service) = key {
                 if let Some(strong_service) = weak_service.upgrade() {
-                    let b = downcast_refcell(strong_service);
+                    let b = downcast_refcell::<T>(strong_service);
                     return b;
                 }
             }
@@ -117,12 +116,6 @@ fn downcast_refcell<T: Any + Default + 'static + Clone>(
     }
     panic!("Failed to downcast refcell!")
 }
-struct ServiceFactory;
-impl ServiceFactory {
-    pub fn create<T: 'static + Any + Default>() -> T {
-        T::default()
-    }
-}
 
 #[derive(Clone)]
 pub struct ServiceCollection {
@@ -142,37 +135,9 @@ impl ServiceCollection {
         }
     }
 
-    pub fn generate_provider(&self) -> () {}
-
     pub fn has_any(&self) -> bool {
         !self.service_collection.is_empty()
     }
-
-    // pub fn get<T: 'static + Any + Default>(&self) -> Option<&T> {
-    //     let name = TypeId::of::<T>();
-    //     println!("get service : {name:?}");
-    //     if let Some(service) = self.service_collection.get(&name) {
-    //         // TODO: match scope, requires requestid? for scoped to compare if we need to make a
-    //         // new isntance
-    //
-    //         // match service.scope {
-    //         //     ServiceScope::Singleton => todo!(),
-    //         //     ServiceScope::Scoped => todo!(),
-    //         //     ServiceScope::Transient => todo!(),
-    //         // }
-    //         // if service.scope == ServiceScope::Transient {
-    //         //     let new_service = Service {
-    //         //         name,
-    //         //         service: Box::new(T::default()),
-    //         //         scope: ServiceScope::Transient,
-    //         //     };
-    //         //
-    //         //     *service = new_service;
-    //         // }
-    //         return service.service.downcast_ref::<T>();
-    //     }
-    //     None
-    // }
 
     pub fn add<T: 'static + Any + Default>(
         &mut self,

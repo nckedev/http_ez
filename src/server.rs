@@ -1,9 +1,11 @@
+use crate::http::method::Method;
 use crate::http::request::Request;
 use crate::http::response::Response;
 use crate::http::{path::Path, status_code::StatusCode};
-use crate::logger::Logger;
-use crate::service::ServiceCollection;
+use crate::logger::{Logger, Severity};
+use crate::service::{ServiceCollection, ServiceProvider};
 use core::panic;
+use std::collections::HashMap;
 use std::{
     io::{BufRead, BufReader},
     net::{TcpListener, TcpStream},
@@ -14,11 +16,11 @@ impl Server {
     ///Starts the listener
     pub fn run(app: &App, ip: &str, port: u32) -> () {
         println!("Listening @ {ip}:{port}");
-        let listner = TcpListener::bind(format!("{ip}:{port}")).unwrap();
 
+        let listner = TcpListener::bind(format!("{ip}:{port}")).unwrap();
         for stream in listner.incoming() {
             let stream = stream.unwrap();
-            Self::handle_connection(app, stream);
+            Self::handle_connection(&app, stream);
         }
     }
 
@@ -30,14 +32,18 @@ impl Server {
             .take_while(|line| !line.is_empty())
             .collect();
 
-        let first: Vec<_> = request_raw
+        let first_line: Vec<_> = request_raw
             .first()
             .expect("no method line")
             .split(' ')
             .collect();
-        debug_assert!(first.len() == 3, "failed to parse method line");
-        //create request object with method(0) path(1) version(2)
-        let mut request = Request::new(first[0].into(), Path::new(first[1]), first[2]);
+        debug_assert!(first_line.len() == 3, "failed to parse method line");
+
+        let [method, path, version] = first_line[..] else {
+            panic!("Failed to parse method line")
+        };
+
+        let mut request = Request::new(method.into(), Path::new(path), version);
 
         // parse headers
         for h in request_raw.iter().skip(1) {
@@ -46,13 +52,14 @@ impl Server {
             }
         }
 
-        println!("logger");
-        // if let Some(logger) = app.service_collection.get::<Logger>() {
-        //     println!("logger");
-        //     logger.log_info("TESTING");
-        // }
+        let mut context = app.get_context(request);
 
-        println!("{:#?}", request);
+        let logger = context.service_provider.get::<Logger>();
+        if app.environment == Environment::Development {
+            logger.borrow_mut().set_log_level(Severity::Trace)
+        }
+        logger.borrow().log_trace("context created");
+
         //assert_eq!(app.service_collection.has_any(), true);
 
         //run request through middleware
@@ -86,17 +93,13 @@ impl AppBuilder {
         }
     }
 
-    pub fn map_route(&mut self) -> &mut Self {
-        self
-    }
-
     pub fn build(self) -> App {
         // service_collection (bara namnen på servicess) -> service_provider i Appcontext
         App::new(self.service_collection)
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq)]
 pub enum Environment {
     #[default]
     Development,
@@ -125,14 +128,17 @@ impl From<&str> for Environment {
     }
 }
 
-struct AppContext {
+pub(crate) struct AppContext<'a> {
     environment: Environment,
+    service_provider: ServiceProvider,
+    request: Request<'a>,
 }
 
 pub struct App {
     service_collection: ServiceCollection,
     middleware: Option<Vec<Box<dyn Middleware>>>,
     environment: Environment,
+    routes: Vec<Route>,
     port: u32,
 }
 
@@ -143,34 +149,71 @@ impl App {
             middleware: None,
             environment: Environment::default(),
             port: 8080,
+            routes: Vec::new(),
         }
     }
-    fn add_middleware(&mut self, args: Box<dyn Middleware>) -> &mut Self {
+
+    fn add_middleware(&mut self, args: Box<dyn Middleware>) -> &Self {
         if let Some(mw) = &mut self.middleware {
             mw.push(args);
         };
 
         self
     }
-}
 
-struct Route {
-    path: String,
-    handler: Box<dyn FnOnce(&str) -> (StatusCode, Response)>,
-}
+    pub fn regiter_route_closure(
+        &mut self,
+        method: Method,
+        route: &str,
+        handler: impl FnOnce(&str) -> Response,
+    ) -> &Self {
+        // TODO: how to match number of parameters to the handler?
+        let a = handler();
+        self
+    }
 
-struct RouteMap {
-    routes: Vec<Route>,
-}
+    pub fn regiter_route<T: Endpoint<Body = T>>(
+        &mut self,
+        method: Method,
+        route: &str,
+        endpoint: T,
+    ) -> &Self {
+        let route = Self::parse_route(route, endpoint);
 
-impl RouteMap {
-    pub fn add_route(&mut self, route: Route) {
-        self.routes.push(route)
+        self.routes.push(route);
+        self
+    }
+
+    fn parse_route<T: Endpoint<Body = T>>(route: &str, handler: T) -> Route<T> {
+        Route {
+            path: route.to_string(),
+            handler: Box::new(handler),
+        }
+    }
+
+    pub fn set_env(&mut self, env: Environment) {
+        self.environment = env;
+    }
+
+    pub(crate) fn get_context<'a>(&'a self, request: Request<'a>) -> AppContext {
+        AppContext {
+            service_provider: self.service_collection.clone().into(),
+            environment: Environment::Development,
+            request,
+        }
     }
 }
-macro_rules! route {
-    () => {};
+
+pub trait Endpoint {
+    type Body;
+    fn handle(&self, params: HashMap<String, String>, body: Self::Body) -> impl Into<Response>;
 }
+
+struct Route<T: Endpoint<Body = T>> {
+    path: String,
+    handler: Box<T>,
+}
+
 trait Middleware {
     fn invoke(&self, req: Request) -> Response;
 }

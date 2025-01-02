@@ -13,4 +13,5 @@ name = "testing"
 path = "src/bin/testing.rs"
 
 [dependencies]
+chrono = "0.4.38"
 uuid = { version = "1.10.0", features = ["fast-rng", "v7"] }
